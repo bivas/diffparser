@@ -151,6 +151,11 @@ func Parse(diffString string) (*Diff, error) {
 		case strings.HasPrefix(l, newFilePrefix):
 			file.NewName = strings.TrimPrefix(l, newFilePrefix)
 		case strings.HasPrefix(l, "@@ "):
+			if file == nil {
+				file = &DiffFile{}
+				diff.Files = append(diff.Files, file)
+				firstHunkInFile = true
+			}
 			if firstHunkInFile {
 				diffPosCount = 0
 				firstHunkInFile = false
@@ -162,15 +167,18 @@ func Parse(diffString string) (*Diff, error) {
 			file.Hunks = append(file.Hunks, hunk)
 
 			// Parse hunk heading for ranges
-			re := regexp.MustCompile(`@@ \-(\d+),(\d+) \+(\d+),?(\d+)? @@`)
+			re := regexp.MustCompile(`@@ \-(\d+),?(\d+)? \+(\d+),?(\d+)? @@`)
 			m := re.FindStringSubmatch(l)
 			a, err := strconv.Atoi(m[1])
 			if err != nil {
 				return nil, err
 			}
-			b, err := strconv.Atoi(m[2])
-			if err != nil {
-				return nil, err
+			b := a
+			if len(m[2]) > 0 {
+				b, err = strconv.Atoi(m[2])
+				if err != nil {
+					return nil, errors.Trace(err)
+				}
 			}
 			c, err := strconv.Atoi(m[3])
 			if err != nil {
